@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
-from .models import Item
+from .models import Item, Features, PredictionResponse
 from . import crud
+from .model_loader import get_model, predict as make_prediction
 
 router = APIRouter()
 
@@ -54,3 +55,43 @@ async def search_items(q: Optional[str] = None, skip: int = 0, limit: int = 10):
     if q:
         results.update({"q": q})
     return results
+
+
+@router.post("/predict/", response_model=PredictionResponse)
+async def predict(features: Features):
+    """
+    ML Prediction Endpoint
+    
+    Accepts feature values and returns a prediction using the trained ML model.
+    
+    Args:
+        features: Features object containing feature1, feature2, and feature3
+    
+    Returns:
+        PredictionResponse with the predicted value
+    
+    Raises:
+        HTTPException: If model is not loaded or prediction fails
+    """
+    try:
+        model = get_model()
+        if model is None:
+            raise HTTPException(
+                status_code=503,
+                detail="ML model is not available. Please ensure the model is loaded."
+            )
+        
+        # Extract features as list
+        feature_list = [features.feature1, features.feature2, features.feature3]
+        
+        # Make prediction
+        prediction_value = make_prediction(feature_list)
+        
+        return PredictionResponse(prediction=prediction_value)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Prediction failed: {str(e)}"
+        )
